@@ -1,10 +1,10 @@
---// Sticky Camlock + WalkSpeed + Fly + 3D Strafe + Noclip + ESP
+--// Karus – Xeno Edition (Sticky Camlock + CFrame Speed + Fly + 3D Strafe + Noclip + Enhanced ESP)
 --// Tabs: Main | Player | Visual | Whitelists
+--// No Silent Aim
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
@@ -28,11 +28,19 @@ local CamlockChecks = {
     TeamCheck = true,
 }
 
-local Whitelist = {}
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- ESP Settings
+-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local ESPSettings = {
+    Enabled = false,
+    Keybind = Enum.KeyCode.E,
+    ShowBox = true,
+    ShowName = true,
+    ShowHealthBar = true,
+    ShowDistance = true,
+    ShowAmmo = true,
+}
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- ESP Checks
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local ESPChecks = {
     WallCheck = true,
     KnockedCheck = true,
@@ -55,7 +63,7 @@ local strafeHAngle = 0
 local strafeVAngle = 0
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- WalkSpeed Settings
+-- WalkSpeed (Humanoid) + CFrame Speed
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 getgenv().walkSpeedSettings = {
     WalkSpeed = { Enabled = true, Speed = 300 },
@@ -64,6 +72,12 @@ getgenv().walkSpeedSettings = {
 
 local isSpeedEnabled = false
 local defaultSpeed = 16
+
+local CFrameSpeedSettings = {
+    Enabled = false,
+    Keybind = Enum.KeyCode.Y,
+    Speed = 150,
+}
 
 local function updateWalkSpeed()
     if not player.Character then return end
@@ -74,14 +88,31 @@ local function updateWalkSpeed()
 end
 
 RunService.RenderStepped:Connect(updateWalkSpeed)
+
 player.CharacterAdded:Connect(function(c)
     task.wait(0.1)
     c:WaitForChild("Humanoid")
     updateWalkSpeed()
 end)
 
+local function updateCFrameSpeed(dt)
+    if not CFrameSpeedSettings.Enabled then return end
+    local char = player.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local moveDir = Vector3.zero
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= camera.CFrame.LookVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= camera.CFrame.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += camera.CFrame.RightVector end
+    if moveDir.Magnitude > 0 then
+        root.CFrame += moveDir.Unit * CFrameSpeedSettings.Speed * dt
+    end
+end
+
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Fly (direct CFrame method)
+-- Fly
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local FlySettings = {
     Enabled = false,
@@ -93,18 +124,14 @@ local flyConn
 
 local function startFly()
     if flyConn then flyConn:Disconnect() flyConn = nil end
-
     flyConn = RunService.Heartbeat:Connect(function(dt)
         if not FlySettings.Enabled then return end
         local c = player.Character
         if not c then return end
         local root = c:FindFirstChild("HumanoidRootPart")
-        local hum  = c:FindFirstChildOfClass("Humanoid")
+        local hum = c:FindFirstChildOfClass("Humanoid")
         if not root or not hum then return end
-
-        -- keep humanoid in freefall state so gravity/physics don't fight us
         hum:ChangeState(Enum.HumanoidStateType.Physics)
-
         local moveDir = Vector3.zero
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += camera.CFrame.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= camera.CFrame.LookVector end
@@ -112,13 +139,10 @@ local function startFly()
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += camera.CFrame.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.yAxis end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.yAxis end
-
         if moveDir.Magnitude > 0 then
-            -- translate position, keep current rotation
             root.CFrame = CFrame.new(root.Position + moveDir.Unit * FlySettings.Speed * dt) * (root.CFrame - root.CFrame.Position)
         else
-            -- no input: freeze in place by zeroing velocity
-            root.AssemblyLinearVelocity  = Vector3.zero
+            root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
         end
     end)
@@ -132,7 +156,7 @@ local function stopFly()
         if hum then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
         local root = c:FindFirstChild("HumanoidRootPart")
         if root then
-            root.AssemblyLinearVelocity  = Vector3.zero
+            root.AssemblyLinearVelocity = Vector3.zero
             root.AssemblyAngularVelocity = Vector3.zero
         end
     end
@@ -166,8 +190,10 @@ end
 RunService.Heartbeat:Connect(updateNoclip)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Validation
+-- Validation + Whitelist
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+local Whitelist = {}
+
 local function isValidForCamlock(plr, char)
     if not char then return false end
     if Whitelist[plr.Name] then return false end
@@ -214,13 +240,8 @@ local function hasLineOfSightESP(targetHead)
 end
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- ESP
+-- Enhanced ESP
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local ESPSettings = {
-    Enabled = false,
-    Keybind = Enum.KeyCode.E,
-}
-
 local espDrawings = {}
 
 local function createESP(plr)
@@ -230,44 +251,116 @@ local function createESP(plr)
     box.Filled = false
     box.Transparency = 1
     box.Color = Color3.fromRGB(255, 50, 50)
+
     local name = Drawing.new("Text")
     name.Size = 14
     name.Center = true
     name.Outline = true
     name.Color = Color3.fromRGB(255, 255, 255)
     name.Text = plr.Name
-    espDrawings[plr] = {Box = box, Name = name}
+
+    local healthBG = Drawing.new("Line")
+    healthBG.Thickness = 3
+    healthBG.Color = Color3.fromRGB(40, 40, 40)
+    healthBG.Transparency = 1
+
+    local healthBar = Drawing.new("Line")
+    healthBar.Thickness = 2
+    healthBar.Color = Color3.fromRGB(0, 255, 0)
+    healthBar.Transparency = 1
+
+    local distanceTxt = Drawing.new("Text")
+    distanceTxt.Size = 13
+    distanceTxt.Center = true
+    distanceTxt.Outline = true
+    distanceTxt.Color = Color3.fromRGB(220, 220, 170)
+
+    local ammoTxt = Drawing.new("Text")
+    ammoTxt.Size = 13
+    ammoTxt.Center = true
+    ammoTxt.Outline = true
+    ammoTxt.Color = Color3.fromRGB(180, 220, 255)
+
+    espDrawings[plr] = {
+        Box = box,
+        Name = name,
+        HealthBG = healthBG,
+        HealthBar = healthBar,
+        Distance = distanceTxt,
+        Ammo = ammoTxt
+    }
 end
 
 local function updateESP()
     for plr, drawings in pairs(espDrawings) do
         local char = plr.Character
-        if ESPSettings.Enabled and char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") then
-            if not isValidForESP(plr, char) or not hasLineOfSightESP(char.Head) then
-                drawings.Box.Visible = false
-                drawings.Name.Visible = false
-                continue
-            end
-            local root = char.HumanoidRootPart
-            local head = char.Head
-            local rootPos, onScreen = camera:WorldToViewportPoint(root.Position)
-            local headPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-            local legPos = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
-            if onScreen then
-                local height = math.abs(headPos.Y - legPos.Y)
-                local width = height * 0.5
-                drawings.Box.Size = Vector2.new(width, height)
-                drawings.Box.Position = Vector2.new(rootPos.X - width/2, rootPos.Y - height/2)
-                drawings.Box.Visible = true
-                drawings.Name.Position = Vector2.new(rootPos.X, rootPos.Y - height/2 - 16)
-                drawings.Name.Visible = true
-            else
-                drawings.Box.Visible = false
-                drawings.Name.Visible = false
-            end
+        if not ESPSettings.Enabled or not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Head") then
+            for _, obj in pairs(drawings) do obj.Visible = false end
+            continue
+        end
+        if not isValidForESP(plr, char) or not hasLineOfSightESP(char.Head) then
+            for _, obj in pairs(drawings) do obj.Visible = false end
+            continue
+        end
+        local root = char.HumanoidRootPart
+        local head = char.Head
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local rootPos, onScreen = camera:WorldToViewportPoint(root.Position)
+        local headPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+        local legPos = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+        if not onScreen then
+            for _, obj in pairs(drawings) do obj.Visible = false end
+            continue
+        end
+        local height = math.abs(headPos.Y - legPos.Y)
+        local width = height * 0.5
+        -- Box
+        drawings.Box.Size = Vector2.new(width, height)
+        drawings.Box.Position = Vector2.new(rootPos.X - width/2, rootPos.Y - height/2)
+        drawings.Box.Visible = ESPSettings.ShowBox
+        -- Name
+        drawings.Name.Position = Vector2.new(rootPos.X, rootPos.Y - height/2 - 16)
+        drawings.Name.Visible = ESPSettings.ShowName
+        -- Health Bar
+        if ESPSettings.ShowHealthBar and hum then
+            local hpRatio = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            local barHeight = height * hpRatio
+            drawings.HealthBG.From = Vector2.new(rootPos.X - width/2 - 6, rootPos.Y - height/2)
+            drawings.HealthBG.To = Vector2.new(rootPos.X - width/2 - 6, rootPos.Y + height/2)
+            drawings.HealthBG.Visible = true
+            drawings.HealthBar.From = Vector2.new(rootPos.X - width/2 - 6, rootPos.Y + height/2)
+            drawings.HealthBar.To = Vector2.new(rootPos.X - width/2 - 6, rootPos.Y + height/2 - barHeight)
+            drawings.HealthBar.Color = Color3.fromHSV(hpRatio * 0.3, 0.9, 0.9)
+            drawings.HealthBar.Visible = true
         else
-            drawings.Box.Visible = false
-            drawings.Name.Visible = false
+            drawings.HealthBG.Visible = false
+            drawings.HealthBar.Visible = false
+        end
+        -- Distance
+        if ESPSettings.ShowDistance then
+            local myRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            local dist = myRoot and (root.Position - myRoot.Position).Magnitude or 0
+            drawings.Distance.Text = string.format("%.0f studs", dist)
+            drawings.Distance.Position = Vector2.new(rootPos.X, rootPos.Y + height/2 + 4)
+            drawings.Distance.Visible = true
+        else
+            drawings.Distance.Visible = false
+        end
+        -- Ammo
+        if ESPSettings.ShowAmmo then
+            local tool = char:FindFirstChildWhichIsA("Tool")
+            local ammoStr = "No gun"
+            if tool then
+                local ammo = tool:FindFirstChild("Ammo") or tool:FindFirstChild("CurrentAmmo") or tool:FindFirstChild("Bullets")
+                if ammo and (ammo:IsA("IntValue") or ammo:IsA("NumberValue")) then
+                    ammoStr = tostring(ammo.Value) .. " ammo"
+                end
+            end
+            drawings.Ammo.Text = ammoStr
+            drawings.Ammo.Position = Vector2.new(rootPos.X, rootPos.Y + height/2 + 20)
+            drawings.Ammo.Visible = true
+        else
+            drawings.Ammo.Visible = false
         end
     end
 end
@@ -278,7 +371,7 @@ RunService.RenderStepped:Connect(updateESP)
 -- GUI Setup
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local sg = Instance.new("ScreenGui")
-sg.Name = "StickyCamlockUI"
+sg.Name = "KarusXenoUI"
 sg.ResetOnSpawn = false
 sg.Parent = player:WaitForChild("PlayerGui")
 
@@ -300,7 +393,7 @@ local titleLabel = Instance.new("TextLabel", titleBar)
 titleLabel.Size = UDim2.new(1, -80, 1, 0)
 titleLabel.Position = UDim2.new(0, 12, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "karus (Made by fuck.19 and 6falsebanpink)"
+titleLabel.Text = "karus – Xeno Edition"
 titleLabel.TextColor3 = Color3.fromRGB(220, 220, 255)
 titleLabel.TextSize = 16
 titleLabel.Font = Enum.Font.GothamBold
@@ -317,11 +410,13 @@ titleBar.InputBegan:Connect(function(input)
         end)
     end
 end)
+
 titleBar.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local delta = input.Position - dragStart
@@ -333,7 +428,7 @@ local status = Instance.new("TextLabel", main)
 status.Size = UDim2.new(1, -20, 0, 24)
 status.Position = UDim2.new(0, 10, 0, 44)
 status.BackgroundTransparency = 1
-status.Text = "Unlocked | Speed: OFF | Fly: OFF | Strafe: OFF | Noclip: OFF | ESP: OFF"
+status.Text = "Unlocked | Speed: OFF | CF-Speed: OFF | Fly: OFF | Strafe: OFF | Noclip: OFF | ESP: OFF"
 status.TextColor3 = Color3.fromRGB(255, 140, 100)
 status.TextSize = 11
 status.Font = Enum.Font.Gotham
@@ -386,7 +481,7 @@ mainTab.Size = UDim2.new(1, -20, 1, -120)
 mainTab.Position = UDim2.new(0, 10, 0, 110)
 mainTab.BackgroundTransparency = 1
 mainTab.ScrollBarThickness = 4
-mainTab.CanvasSize = UDim2.new(0, 0, 0, 1400)
+mainTab.CanvasSize = UDim2.new(0, 0, 0, 1600)
 mainTab.Visible = true
 
 local playerTab = Instance.new("ScrollingFrame", main)
@@ -394,7 +489,7 @@ playerTab.Size = UDim2.new(1, -20, 1, -120)
 playerTab.Position = UDim2.new(0, 10, 0, 110)
 playerTab.BackgroundTransparency = 1
 playerTab.ScrollBarThickness = 4
-playerTab.CanvasSize = UDim2.new(0, 0, 0, 600)
+playerTab.CanvasSize = UDim2.new(0, 0, 0, 900)
 playerTab.Visible = false
 
 local visualTab = Instance.new("ScrollingFrame", main)
@@ -402,7 +497,7 @@ visualTab.Size = UDim2.new(1, -20, 1, -120)
 visualTab.Position = UDim2.new(0, 10, 0, 110)
 visualTab.BackgroundTransparency = 1
 visualTab.ScrollBarThickness = 4
-visualTab.CanvasSize = UDim2.new(0, 0, 0, 600)
+visualTab.CanvasSize = UDim2.new(0, 0, 0, 800)
 visualTab.Visible = false
 
 local whitelistTab = Instance.new("ScrollingFrame", main)
@@ -414,13 +509,13 @@ whitelistTab.CanvasSize = UDim2.new(0, 0, 0, 0)
 whitelistTab.Visible = false
 
 local function switchTab(tab)
-    mainTab.Visible      = tab == "main"
-    playerTab.Visible    = tab == "player"
-    visualTab.Visible    = tab == "visual"
+    mainTab.Visible = tab == "main"
+    playerTab.Visible = tab == "player"
+    visualTab.Visible = tab == "visual"
     whitelistTab.Visible = tab == "whitelist"
-    tabMain.BackgroundColor3      = tab == "main"      and Color3.fromRGB(60,160,100) or Color3.fromRGB(40,40,55)
-    tabPlayer.BackgroundColor3    = tab == "player"    and Color3.fromRGB(60,160,100) or Color3.fromRGB(40,40,55)
-    tabVisual.BackgroundColor3    = tab == "visual"    and Color3.fromRGB(60,160,100) or Color3.fromRGB(40,40,55)
+    tabMain.BackgroundColor3 = tab == "main" and Color3.fromRGB(60,160,100) or Color3.fromRGB(40,40,55)
+    tabPlayer.BackgroundColor3 = tab == "player" and Color3.fromRGB(60,160,100) or Color3.fromRGB(40,40,55)
+    tabVisual.BackgroundColor3 = tab == "visual" and Color3.fromRGB(60,160,100) or Color3.fromRGB(40,40,55)
     tabWhitelist.BackgroundColor3 = tab == "whitelist" and Color3.fromRGB(60,160,100) or Color3.fromRGB(40,40,55)
 end
 
@@ -439,7 +534,6 @@ local function refreshWhitelistTab()
     local y = 0
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr == player then continue end
-
         local nameLabel = Instance.new("TextLabel", whitelistTab)
         nameLabel.Size = UDim2.new(0.7, 0, 0, 30)
         nameLabel.Position = UDim2.new(0, 0, 0, y)
@@ -466,20 +560,17 @@ local function refreshWhitelistTab()
             toggleBtn.BackgroundColor3 = Whitelist[capturedPlr.Name] and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 0, 0)
             toggleBtn.Text = Whitelist[capturedPlr.Name] and "Whitelisted" or "Lockable"
         end)
-
         y = y + 36
     end
     whitelistTab.CanvasSize = UDim2.new(0, 0, 0, math.max(y, 1))
 end
 
--- NOW set up ESP + whitelist for existing players
 for _, plr in ipairs(Players:GetPlayers()) do
     if plr ~= player then
         createESP(plr)
         Whitelist[plr.Name] = false
     end
 end
-
 refreshWhitelistTab()
 
 Players.PlayerAdded:Connect(function(plr)
@@ -492,8 +583,9 @@ end)
 
 Players.PlayerRemoving:Connect(function(plr)
     if espDrawings[plr] then
-        espDrawings[plr].Box:Remove()
-        espDrawings[plr].Name:Remove()
+        for k, v in pairs(espDrawings[plr]) do
+            v:Remove()
+        end
         espDrawings[plr] = nil
     end
     Whitelist[plr.Name] = nil
@@ -586,6 +678,7 @@ strKnob.Position = UDim2.new(CamlockSettings.Strength, -8, 0.5, -8)
 strKnob.BackgroundColor3 = Color3.fromRGB(220, 220, 255)
 strKnob.BorderSizePixel = 0
 Instance.new("UICorner", strKnob).CornerRadius = UDim.new(1, 0)
+
 yMain = yMain + 50
 
 local fovLabel = strLabel:Clone()
@@ -754,7 +847,7 @@ noclipChangeBtn.Font = Enum.Font.GothamSemibold
 Instance.new("UICorner", noclipChangeBtn).CornerRadius = UDim.new(0, 6)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Player Tab
+-- Player Tab Content
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local yPlayer = 0
 
@@ -818,6 +911,66 @@ wsKnob.BorderSizePixel = 0
 Instance.new("UICorner", wsKnob).CornerRadius = UDim.new(1, 0)
 yPlayer = yPlayer + 50
 
+local cfSpeedBtn = Instance.new("TextButton", playerTab)
+cfSpeedBtn.Size = UDim2.new(1, 0, 0, 34)
+cfSpeedBtn.Position = UDim2.new(0, 0, 0, yPlayer)
+cfSpeedBtn.BackgroundColor3 = CFrameSpeedSettings.Enabled and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+cfSpeedBtn.Text = "Toggle CFrame Speed"
+cfSpeedBtn.TextColor3 = Color3.fromRGB(200, 200, 255)
+cfSpeedBtn.TextSize = 14
+cfSpeedBtn.Font = Enum.Font.GothamSemibold
+Instance.new("UICorner", cfSpeedBtn).CornerRadius = UDim.new(0, 6)
+yPlayer = yPlayer + 40
+
+local cfKeyLabel = Instance.new("TextLabel", playerTab)
+cfKeyLabel.Size = UDim2.new(0.7, 0, 0, 28)
+cfKeyLabel.Position = UDim2.new(0, 0, 0, yPlayer)
+cfKeyLabel.BackgroundTransparency = 1
+cfKeyLabel.Text = "CFrame Speed Key: Y"
+cfKeyLabel.TextColor3 = Color3.fromRGB(160, 160, 220)
+cfKeyLabel.TextSize = 13
+cfKeyLabel.Font = Enum.Font.Gotham
+cfKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local cfChangeBtn = Instance.new("TextButton", playerTab)
+cfChangeBtn.Size = UDim2.new(0.3, 0, 0, 28)
+cfChangeBtn.Position = UDim2.new(0.7, 0, 0, yPlayer)
+cfChangeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+cfChangeBtn.Text = "Change"
+cfChangeBtn.TextColor3 = Color3.fromRGB(220, 220, 255)
+cfChangeBtn.TextSize = 13
+cfChangeBtn.Font = Enum.Font.GothamSemibold
+Instance.new("UICorner", cfChangeBtn).CornerRadius = UDim.new(0, 6)
+yPlayer = yPlayer + 34
+
+local cfLabel = Instance.new("TextLabel", playerTab)
+cfLabel.Size = UDim2.new(1, 0, 0, 18)
+cfLabel.Position = UDim2.new(0, 0, 0, yPlayer)
+cfLabel.BackgroundTransparency = 1
+cfLabel.Text = "CFrame Speed: 150"
+cfLabel.TextColor3 = Color3.fromRGB(180, 180, 220)
+cfLabel.TextSize = 13
+cfLabel.Font = Enum.Font.Gotham
+
+local cfBg = Instance.new("Frame", playerTab)
+cfBg.Size = UDim2.new(1, 0, 0, 8)
+cfBg.Position = UDim2.new(0, 0, 0, yPlayer + 24)
+cfBg.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+cfBg.BorderSizePixel = 0
+
+local cfFill = Instance.new("Frame", cfBg)
+cfFill.Size = UDim2.new(CFrameSpeedSettings.Speed / 500, 0, 1, 0)
+cfFill.BackgroundColor3 = Color3.fromRGB(110, 80, 240)
+cfFill.BorderSizePixel = 0
+
+local cfKnob = Instance.new("Frame", cfBg)
+cfKnob.Size = UDim2.new(0, 16, 0, 16)
+cfKnob.Position = UDim2.new(CFrameSpeedSettings.Speed / 500, -8, 0.5, -8)
+cfKnob.BackgroundColor3 = Color3.fromRGB(220, 220, 255)
+cfKnob.BorderSizePixel = 0
+Instance.new("UICorner", cfKnob).CornerRadius = UDim.new(1, 0)
+yPlayer = yPlayer + 50
+
 local flyBtn = Instance.new("TextButton", playerTab)
 flyBtn.Size = UDim2.new(1, 0, 0, 34)
 flyBtn.Position = UDim2.new(0, 0, 0, yPlayer)
@@ -878,7 +1031,7 @@ flySpeedKnob.BorderSizePixel = 0
 Instance.new("UICorner", flySpeedKnob).CornerRadius = UDim.new(1, 0)
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Visual Tab
+-- Visual Tab Content
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local yVisual = 0
 
@@ -936,74 +1089,94 @@ createESPCheckToggle("Wall Check", "WallCheck")
 createESPCheckToggle("Knocked Check", "KnockedCheck")
 createESPCheckToggle("Death Check", "DeathCheck")
 createESPCheckToggle("Team Check", "TeamCheck")
+yVisual = yVisual + 10
+
+local function createESPDisplayToggle(name, key)
+    local btn = Instance.new("TextButton", visualTab)
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.Position = UDim2.new(0, 0, 0, yVisual)
+    btn.BackgroundColor3 = ESPSettings[key] and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+    btn.Text = name .. ": " .. (ESPSettings[key] and "ON" or "OFF")
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamSemibold
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    btn.MouseButton1Click:Connect(function()
+        ESPSettings[key] = not ESPSettings[key]
+        btn.BackgroundColor3 = ESPSettings[key] and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+        btn.Text = name .. ": " .. (ESPSettings[key] and "ON" or "OFF")
+    end)
+    yVisual = yVisual + 36
+end
+
+createESPDisplayToggle("Show Box", "ShowBox")
+createESPDisplayToggle("Show Name", "ShowName")
+createESPDisplayToggle("Health Bar", "ShowHealthBar")
+createESPDisplayToggle("Distance", "ShowDistance")
+createESPDisplayToggle("Ammo", "ShowAmmo")
 
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Status
+-- Status + Sliders + Keybinds
 -- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 local function updateStatus()
-    local lockStr = CamlockSettings.Locked
-        and ("Locked: " .. (CamlockSettings.LockedPlayer and CamlockSettings.LockedPlayer.Name or "None"))
-        or "Unlocked"
+    local lockStr = CamlockSettings.Locked and ("Locked: " .. (CamlockSettings.LockedPlayer and CamlockSettings.LockedPlayer.Name or "None")) or "Unlocked"
     status.Text = lockStr
         .. " | Speed: " .. (isSpeedEnabled and "ON" or "OFF")
+        .. " | CF-Speed: " .. (CFrameSpeedSettings.Enabled and "ON" or "OFF")
         .. " | Fly: " .. (FlySettings.Enabled and "ON" or "OFF")
         .. " | Strafe: " .. (StrafeSettings.Enabled and "ON" or "OFF")
         .. " | Noclip: " .. (NoclipSettings.Enabled and "ON" or "OFF")
         .. " | ESP: " .. (ESPSettings.Enabled and "ON" or "OFF")
     status.TextColor3 = CamlockSettings.Locked and Color3.fromRGB(100,255,140) or Color3.fromRGB(255,140,100)
+
     camlockBtn.BackgroundColor3 = CamlockSettings.Locked and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
-    speedBtn.BackgroundColor3   = isSpeedEnabled          and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
-    flyBtn.BackgroundColor3     = FlySettings.Enabled     and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
-    strafeBtn.BackgroundColor3  = StrafeSettings.Enabled  and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
-    noclipBtn.BackgroundColor3  = NoclipSettings.Enabled  and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
-    espBtn.BackgroundColor3     = ESPSettings.Enabled     and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+    speedBtn.BackgroundColor3 = isSpeedEnabled and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+    cfSpeedBtn.BackgroundColor3 = CFrameSpeedSettings.Enabled and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+    flyBtn.BackgroundColor3 = FlySettings.Enabled and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+    strafeBtn.BackgroundColor3 = StrafeSettings.Enabled and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+    noclipBtn.BackgroundColor3 = NoclipSettings.Enabled and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
+    espBtn.BackgroundColor3 = ESPSettings.Enabled and Color3.fromRGB(60,160,100) or Color3.fromRGB(90,50,50)
 end
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Sliders – FIXED camlock label (only this part changed)
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-local function setupSlider(bg, fill, knob, label, setter, maxVal, labelFormat)
-    local draggingS = false
+local function setupSlider(bg, fill, knob, label, setter, maxVal, formatStr)
+    local dragging = false
     bg.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingS = true
+            dragging = true
         end
     end)
     bg.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            draggingS = false
+            dragging = false
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if not draggingS then return end
+        if not dragging then return end
         if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
         local pct = math.clamp((input.Position.X - bg.AbsolutePosition.X) / bg.AbsoluteSize.X, 0, 1)
         fill.Size = UDim2.new(pct, 0, 1, 0)
         knob.Position = UDim2.new(pct, -8, 0.5, -8)
-        local value = maxVal and math.floor(pct * maxVal) or pct
-        setter(value)
-        -- FIXED LINE: always format as percentage when maxVal is nil
-        if maxVal == nil then
-            label.Text = string.format("Camlock Strength: %.0f%%", pct * 100)
-        else
-            label.Text = string.format(labelFormat or "%d", value)
-        end
+        local val = maxVal and math.floor(pct * maxVal) or pct
+        setter(val)
+        label.Text = string.format(formatStr or "%.0f", val)
     end)
 end
 
 setupSlider(strBg, strFill, strKnob, strLabel, function(v) CamlockSettings.Strength = v end, nil, "Camlock Strength: %.0f%%")
 setupSlider(fovBg, fovFill, fovKnob, fovLabel, function(v) CamlockSettings.FOV = v end, 500, "Lock FOV: %d px")
-setupSlider(flySpeedBg, flySpeedFill, flySpeedKnob, flySpeedLabel, function(v) FlySettings.Speed = v end, 1000, "Fly Speed: %d")
 setupSlider(wsBg, wsFill, wsKnob, wsLabel, function(v) getgenv().walkSpeedSettings.WalkSpeed.Speed = v end, 500, "WalkSpeed: %d")
+setupSlider(cfBg, cfFill, cfKnob, cfLabel, function(v) CFrameSpeedSettings.Speed = v end, 500, "CFrame Speed: %d")
+setupSlider(flySpeedBg, flySpeedFill, flySpeedKnob, flySpeedLabel, function(v) FlySettings.Speed = v end, 1000, "Fly Speed: %d")
 setupSlider(strafeSpinBg, strafeSpinFill, strafeSpinKnob, strafeSpinLabel, function(v) StrafeSettings.HSpeed = v end, 20, "Strafe Spin Speed: %d")
 setupSlider(strafeRadiusBg, strafeRadiusFill, strafeRadiusKnob, strafeRadiusLabel, function(v) StrafeSettings.Radius = v end, 20, "Strafe Radius: %d")
 setupSlider(strafeHeightBg, strafeHeightFill, strafeHeightKnob, strafeHeightLabel, function(v) StrafeSettings.VSpeed = v end, 10, "Strafe Height: %.1f")
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Keybind Changing
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- Keybind changing
 local changingFor = nil
-local allChangeBtns = {camChangeBtn, speedChangeBtn, flyChangeBtn, strafeChangeBtn, noclipChangeBtn, espChangeBtn}
+local allChangeBtns = {
+    camChangeBtn, speedChangeBtn, cfChangeBtn, flyChangeBtn,
+    strafeChangeBtn, noclipChangeBtn, espChangeBtn
+}
 
 local function resetChangeBtns()
     for _, b in ipairs(allChangeBtns) do
@@ -1018,33 +1191,45 @@ local function startChangeKey(forWhat, btn)
     btn.BackgroundColor3 = Color3.fromRGB(90, 60, 120)
 end
 
-camChangeBtn.MouseButton1Click:Connect(function()    startChangeKey("Camlock", camChangeBtn) end)
-speedChangeBtn.MouseButton1Click:Connect(function()  startChangeKey("Speed",   speedChangeBtn) end)
-flyChangeBtn.MouseButton1Click:Connect(function()    startChangeKey("Fly",     flyChangeBtn) end)
-strafeChangeBtn.MouseButton1Click:Connect(function() startChangeKey("Strafe",  strafeChangeBtn) end)
-noclipChangeBtn.MouseButton1Click:Connect(function() startChangeKey("Noclip",  noclipChangeBtn) end)
-espChangeBtn.MouseButton1Click:Connect(function()    startChangeKey("ESP",     espChangeBtn) end)
+camChangeBtn.MouseButton1Click:Connect(function() startChangeKey("Camlock", camChangeBtn) end)
+speedChangeBtn.MouseButton1Click:Connect(function() startChangeKey("Speed", speedChangeBtn) end)
+cfChangeBtn.MouseButton1Click:Connect(function() startChangeKey("CFrameSpeed", cfChangeBtn) end)
+flyChangeBtn.MouseButton1Click:Connect(function() startChangeKey("Fly", flyChangeBtn) end)
+strafeChangeBtn.MouseButton1Click:Connect(function() startChangeKey("Strafe", strafeChangeBtn) end)
+noclipChangeBtn.MouseButton1Click:Connect(function() startChangeKey("Noclip", noclipChangeBtn) end)
+espChangeBtn.MouseButton1Click:Connect(function() startChangeKey("ESP", espChangeBtn) end)
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Input Handling
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- Input handling
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
-
-    -- Keybind capture
     if changingFor then
         if input.KeyCode == Enum.KeyCode.Escape then
             changingFor = nil
             resetChangeBtns()
         elseif input.KeyCode ~= Enum.KeyCode.Unknown then
             local key = input.KeyCode
-            local keyName = key.Name
-            if     changingFor == "Camlock" then CamlockSettings.Keybind = key camKeyLabel.Text = "Camlock Key: "..keyName
-            elseif changingFor == "Speed"   then getgenv().walkSpeedSettings.Activation.WalkSpeedToggleKey = key speedKeyLabel.Text = "Speed Key: "..keyName
-            elseif changingFor == "Fly"     then FlySettings.Keybind = key flyKeyLabel.Text = "Fly Key: "..keyName
-            elseif changingFor == "Strafe"  then StrafeSettings.Keybind = key strafeKeyLabel.Text = "Strafe Key: "..keyName
-            elseif changingFor == "Noclip"  then NoclipSettings.Keybind = key noclipKeyLabel.Text = "Noclip Key: "..keyName
-            elseif changingFor == "ESP"     then ESPSettings.Keybind = key espKeyLabel.Text = "ESP Key: "..keyName
+            local name = key.Name
+            if changingFor == "Camlock" then
+                CamlockSettings.Keybind = key
+                camKeyLabel.Text = "Camlock Key: " .. name
+            elseif changingFor == "Speed" then
+                getgenv().walkSpeedSettings.Activation.WalkSpeedToggleKey = key
+                speedKeyLabel.Text = "Speed Key: " .. name
+            elseif changingFor == "CFrameSpeed" then
+                CFrameSpeedSettings.Keybind = key
+                cfKeyLabel.Text = "CFrame Speed Key: " .. name
+            elseif changingFor == "Fly" then
+                FlySettings.Keybind = key
+                flyKeyLabel.Text = "Fly Key: " .. name
+            elseif changingFor == "Strafe" then
+                StrafeSettings.Keybind = key
+                strafeKeyLabel.Text = "Strafe Key: " .. name
+            elseif changingFor == "Noclip" then
+                NoclipSettings.Keybind = key
+                noclipKeyLabel.Text = "Noclip Key: " .. name
+            elseif changingFor == "ESP" then
+                ESPSettings.Keybind = key
+                espKeyLabel.Text = "ESP Key: " .. name
             end
             changingFor = nil
             resetChangeBtns()
@@ -1052,7 +1237,6 @@ UserInputService.InputBegan:Connect(function(input, gpe)
         return
     end
 
-    -- Camlock
     if input.KeyCode == CamlockSettings.Keybind then
         if CamlockSettings.Locked then
             CamlockSettings.Locked = false
@@ -1101,20 +1285,22 @@ UserInputService.InputBegan:Connect(function(input, gpe)
         updateStatus()
     end
 
-    -- Speed
     if input.KeyCode == getgenv().walkSpeedSettings.Activation.WalkSpeedToggleKey then
         isSpeedEnabled = not isSpeedEnabled
         updateStatus()
     end
 
-    -- Fly
+    if input.KeyCode == CFrameSpeedSettings.Keybind then
+        CFrameSpeedSettings.Enabled = not CFrameSpeedSettings.Enabled
+        updateStatus()
+    end
+
     if input.KeyCode == FlySettings.Keybind then
         FlySettings.Enabled = not FlySettings.Enabled
         if FlySettings.Enabled then startFly() else stopFly() end
         updateStatus()
     end
 
-    -- Strafe
     if input.KeyCode == StrafeSettings.Keybind then
         if not CamlockSettings.Locked then return end
         StrafeSettings.Enabled = not StrafeSettings.Enabled
@@ -1123,64 +1309,55 @@ UserInputService.InputBegan:Connect(function(input, gpe)
         updateStatus()
     end
 
-    -- Noclip
     if input.KeyCode == NoclipSettings.Keybind then
         NoclipSettings.Enabled = not NoclipSettings.Enabled
         updateNoclip()
         updateStatus()
     end
 
-    -- ESP
     if input.KeyCode == ESPSettings.Keybind then
         ESPSettings.Enabled = not ESPSettings.Enabled
         updateStatus()
     end
 end)
 
--- GUI buttons
+-- GUI button clicks
 camlockBtn.MouseButton1Click:Connect(function()
-    UserInputService:SendInput({UserInputType = Enum.UserInputType.Keyboard, KeyCode = CamlockSettings.Keybind}, nil)
+    UserInputService:SendInput({UserInputType = Enum.UserInputType.Keyboard, KeyCode = CamlockSettings.Keybind})
 end)
 speedBtn.MouseButton1Click:Connect(function()
-    isSpeedEnabled = not isSpeedEnabled updateStatus()
+    isSpeedEnabled = not isSpeedEnabled
+    updateStatus()
+end)
+cfSpeedBtn.MouseButton1Click:Connect(function()
+    CFrameSpeedSettings.Enabled = not CFrameSpeedSettings.Enabled
+    updateStatus()
 end)
 flyBtn.MouseButton1Click:Connect(function()
     FlySettings.Enabled = not FlySettings.Enabled
-    if FlySettings.Enabled then startFly() else stopFly() end updateStatus()
+    if FlySettings.Enabled then startFly() else stopFly() end
+    updateStatus()
 end)
 strafeBtn.MouseButton1Click:Connect(function()
     if not CamlockSettings.Locked then return end
     StrafeSettings.Enabled = not StrafeSettings.Enabled
     NoclipSettings.Enabled = StrafeSettings.Enabled
-    updateNoclip() updateStatus()
+    updateNoclip()
+    updateStatus()
 end)
 noclipBtn.MouseButton1Click:Connect(function()
     NoclipSettings.Enabled = not NoclipSettings.Enabled
-    updateNoclip() updateStatus()
+    updateNoclip()
+    updateStatus()
 end)
 espBtn.MouseButton1Click:Connect(function()
-    ESPSettings.Enabled = not ESPSettings.Enabled updateStatus()
+    ESPSettings.Enabled = not ESPSettings.Enabled
+    updateStatus()
 end)
 
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Camlock Loop
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RunService.RenderStepped:Connect(function()
-    if CamlockSettings.Locked and CamlockSettings.LockedPlayer and CamlockSettings.LockedTarget then
-        if not CamlockSettings.LockedTarget.Parent then
-            CamlockSettings.LockedTarget = nil
-            return
-        end
-        local targetPos = CamlockSettings.LockedTarget.Position
-        local newCFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
-        camera.CFrame = camera.CFrame:Lerp(newCFrame, CamlockSettings.Strength)
-    end
-end)
-
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
--- Strafe Loop
--- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-- Loops
 RunService.Heartbeat:Connect(function(dt)
+    updateCFrameSpeed(dt)
     if StrafeSettings.Enabled and CamlockSettings.LockedTarget and CamlockSettings.LockedTarget.Parent then
         strafeHAngle += StrafeSettings.HSpeed * dt
         strafeVAngle += StrafeSettings.VSpeed * dt
@@ -1195,5 +1372,17 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
+RunService.RenderStepped:Connect(function()
+    if CamlockSettings.Locked and CamlockSettings.LockedPlayer and CamlockSettings.LockedTarget then
+        if not CamlockSettings.LockedTarget.Parent then
+            CamlockSettings.LockedTarget = nil
+            return
+        end
+        local targetPos = CamlockSettings.LockedTarget.Position
+        local newCFrame = CFrame.lookAt(camera.CFrame.Position, targetPos)
+        camera.CFrame = camera.CFrame:Lerp(newCFrame, CamlockSettings.Strength)
+    end
+end)
+
 updateStatus()
-print("Karus loaded – camlock slider label now correctly shows 0–100%")
+print("Karus Xeno Edition loaded – Enhanced ESP + CFrame Speed added")
